@@ -8,8 +8,8 @@ const Header = () => (
 );
 
 const UserInput = ({ onSubmit }) => {
-	const [ username, setUsername ] = useState('weixlblau');
-	const [ password, setPassword ] = useState('S3cure_unt1s');
+	const [ username, setUsername ] = useState('');
+	const [ password, setPassword ] = useState('');
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
@@ -35,8 +35,6 @@ const App = () => {
 
 	const onUserSubmit = async ({ username, password }) => {
 		await api.authenticate(username, password);
-
-		console.log('data last updated', await api.getUpdateDate());
 	};
 
 	return (<div id="app">
