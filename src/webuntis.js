@@ -1,88 +1,68 @@
+import { request } from 'axios';
+import { version } from '../package.json';
+
+const constants = {
+    // TODO: Is there a naming convention?
+    CLIENT: `skips/${version} (http://fsoc.space)`,
+    RPC_URL: 'https://erato.webuntis.com/WebUntis/jsonrpc.do',
+};
+
 export default class WebUntis {
-    client = 'fsoc.space::skips';
-
-    rpc = {
-        id: 0,
-        url: 'https://erato.webuntis.com/WebUntis/jsonrpc.do',
-    };
-
-    headers = {
-        'User-Agent': this.client,
-    };
-
     cookies = {};
+    sessionId = null;
+    currentPerson = null;
 
-    person = {
-        id: null,
-        type: null,
-        klasse: null, // Grade? Form?
-    };
+    static WrapRPC(method, body) {
+        return {
+            id: Date.now().toString(36), // Arbitrary
+            method,
+            params: body,
+            jsonrpc: '2.0',
+        };
+    }
 
     constructor(school) {
         this.school = school;
-        this.schoolHash = '_' + window.btoa(school);
-
-        this.cookies['schoolname'] = this.schoolHash;
-    }
-
-    async rpcRequest(method, params = {}, config = {}) {
-        // Includes school param in every request, not sure if required
-        const query = new URLSearchParams(
-            Object.assign({ school: this.school }, config.query)
-        );
-
-        const uri = this.rpc.url + (query ? ('?' + query) : '');
-
-        const body = JSON.stringify({
-            method,
-            params,
-            jsonrpc: '2.0',
-            id: ++this.rpc.id,
-        });
-
-        const headers = Object.assign(this.headers, config.cookies !== false ? {
-            'Cookies': Object.values(this.cookies)
-                .map((c) => `${c}=${this.cookies[c]};`).join(' ')
-        } : {});
-
-        console.log('sending rpc request to', uri, body, headers);
-
-        const response = await (await fetch(uri, {
-            body,
-            headers,
-            method: 'POST',
-            credentials: 'include',
-        })).json();
-
-        console.log('got rpc response', response);
-
-        return await response;
     }
 
     async authenticate(username, password) {
-        const response = await this.rpcRequest('authenticate', {
-            user: username, password, client: this.client,
-        }, { cookies: false });
+        const response = await request({
+            method: 'post',
+            url: constants.RPC_URL,
+            params: {
+                school: this.school,
+            },
+            data: WebUntis.WrapRPC('authenticate', {
+                user: username,
+                password,
+            }),
+        });
 
-        const { result } = response;
-        if (!response.error && result) {
-            if (!result.sessionid && !result.personId) {
-                throw new Error('Incomplete response');
-            }
+        const { personType, personId, klasseId } = response.data.result;
+        this.currentPerson = {
+            id: personId,
+            type: personType,
+            klasse: klasseId,
+        };
 
-            this.cookies['JSESSIONID'] = result.sessionid;
-
-            this.person.id = result.personId;
-            this.person.type = result.personType;
-            this.person.klasse = result.klasseId;
-        }
-
-        return response;
-    }
-
-    async getUpdateDate() {
-        const response = await this.rpcRequest('getLatestImportTime');
+        this.sessionId = response.data.result.sessionId;
 
         return response;
     }
-}
+
+    async rpc(method) {
+        const response = await request({
+            method: 'post',
+            withCredentials: true,
+            url: constants.RPC_URL,
+            data: WebUntis.WrapRPC(method, { test: true }),
+            headers: { 'Cookies': 'JSESSIONID=' + this.sessionId + ';' },
+        });
+
+        console.log(response);
+
+        return response;
+    }
+};
+
+window.WebUntis = WebUntis;
