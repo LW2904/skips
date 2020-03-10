@@ -1,7 +1,9 @@
 const axios = require('axios');
+const fetch = require('node-fetch');
 const { version } = require('../package.json');
 
 const constants = {
+    SCHOOL: 'borglinz',
     // TODO: Is there a User-Agent naming convention?
     USER_AGENT: `skips/${version} (http://fsoc.space)`,
     RPC_URL: 'https://erato.webuntis.com/WebUntis/jsonrpc.do',
@@ -31,18 +33,14 @@ const WebUntis = class WebUntis {
         }
     }
 
-    constructor(school) {
-        this.school = school;
-    }
-
     async rpcRequest(method, data, config = {}) {
-        const request = {
-            method: 'post',
+        const req = {
+            method: 'POST',
             url: constants.RPC_URL,
-            params: config.params || {},
+            qs: config.params || {},
             headers: {
                 'User-Agent': constants.USER_AGENT,
-                'Cookie': config.includeCookies ? this.cookies.join('; ') : '',
+                // 'Cookie': config.includeCookies ? this.cookies.join('; ') : '',
             },
             data: {
                 id: Date.now().toString(36), // Arbitrary
@@ -50,12 +48,12 @@ const WebUntis = class WebUntis {
                 params: data,
                 jsonrpc: '2.0',
             },
-            withCredentials: true,
+            // withCredentials: true,
         };
 
         console.log('sending rpc request');
 
-        const response = await axios(request);
+        const response = await axios(req);
 
         console.log('got rpc response', response.statusText);
 
@@ -77,7 +75,7 @@ const WebUntis = class WebUntis {
     async authenticate(username, password) {
         const { data } = await this.rpcRequest('authenticate', {
             user: username, password,
-        }, { params: { school: this.school } });
+        }, { params: { school: constants.SCHOOL } });
 
         const { sessionId } = data.result;
         this.sessionId = sessionId;
@@ -107,37 +105,23 @@ const WebUntis = class WebUntis {
     }
 
     async getAbsences(from, to) {
-        const config = {
-            method: 'post',
-            url: constants.API_URL + 'classreg/absences/students',
-            headers: {
-                'User-Agent': constants.USER_AGENT,
-                'Cookie': this.cookies.join('; '),
-                // The following are unneccesary
-                'Origin': 'https://erato.webuntis.com',
-                'Host': 'erato.webuntis.com',
-                'Referer': 'https://erato.webuntis.com/WebUntis/index.do',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
+        const response = await fetch("https://erato.webuntis.com/WebUntis/api/classreg/absences/students?studentId=2524&startDate=20190909&endDate=20200712&excuseStatusId=-3&includeTodaysAbsence=true", {
+            "headers": {
+                "accept": "application/json",
+                "accept-language": "en-US,en;q=0.9",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "cookie": "JSESSIONID=F4A336133AE934E84EBA26A3C5D81736; schoolname=\"_Ym9yZ2xpbno=\"; traceId=f034381f324ce95406c433345b229156f0dfeab4"
             },
-            params: {
-                studentId: this.currentPerson.personId,
-                startDate: new WebUntis.UntisDate(from).dateString,
-                endDate: new WebUntis.UntisDate(to).dateString,
-                excuseStatusId: -1, // What's this?
-                // includeTodaysAbsences: true, // I guess?
-            },
-            withCredentials: true,
-        };
+            "referrer": "https://erato.webuntis.com/WebUntis/?school=borglinz",
+            "referrerPolicy": "no-referrer-when-downgrade",
+            "body": null,
+            "method": "GET",
+            "mode": "cors"
+        });
 
-        console.log('sending api request', config);
-
-        const response = await axios(config);
-
-        console.log('got api response', response.statusText);
-
-        return response;
+        return response.text();
     }
 };
 
