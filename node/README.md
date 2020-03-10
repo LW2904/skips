@@ -1,17 +1,34 @@
 ## `skips/node`
 
-1. `POST https://erato.webuntis.com/WebUntis/j_spring_security_check`
+```javascript
+class WebUntis {
+    constructor(schoolname)
 
-With the following Form Data:
-
-```
-{
-    school: borglinz, j_username: USER, j_password: PASS, token: <empty>
+    async authenticate(username, password)
+    async getAbsences(startDate, endDate)
+    async getCurrentSchoolyear()
 }
 ```
 
-Returns `JSESSION`, `schoolname` (`_ + Base64(borglinz)`?) and auth (also looks like `_ + Base64(?)`) through Set-Cookie.
+Note that `startDate` and `endDate` should be date strings of the format `YYYYMMDD`, the same format is also used internally by Untis and in the dates returned by `getCurrentSchoolyear()`.
 
-_TODO: Why would Base64 encoded strings be prefixed with an underscore. Is there a Base64 encoder which does this by default (Untis uses Java)._
+### Example
 
+```javascript
+// src/example.js
+const { WebUntis } = require('./webuntis');
 
+(async () => {
+
+const api = new WebUntis(UNTIS_SCHOOL);
+
+await api.authenticate(UNTIS_USER, UNTIS_PASS);
+
+const { startDate, endDate } = await api.getCurrentSchoolyear();
+const absences = await api.getAbsences(startDate, endDate);
+
+console.log(absences);
+
+})().catch(console.error);
+
+```
