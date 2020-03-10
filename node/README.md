@@ -2,11 +2,11 @@
 
 ```javascript
 class WebUntis {
-    constructor(schoolname)
+    constructor(schoolname)                 { /* ... */ }
 
-    async authenticate(username, password)
-    async getAbsences(startDate, endDate)
-    async getCurrentSchoolyear()
+    async authenticate(username, password)  { /* ... */ }
+    async getAbsences(startDate, endDate)   { /* ... */ }
+    async getCurrentSchoolyear()            { /* ... */ }
 }
 ```
 
