@@ -1,5 +1,3 @@
-Looks like the service allowing students to view their absences was discontinued. So is this project.
-
 # skips
 
 ## CLI Commands
