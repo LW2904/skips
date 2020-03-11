@@ -16,7 +16,6 @@ const absences = await api.getAbsences(startDate, endDate);
 console.log(absences);
 
 })().catch(console.error);
-
 ```
 
 ## Classes
@@ -38,7 +37,6 @@ console.log(absences);
 <a name="WebUntis"></a>
 
 ## WebUntis
-**Kind**: global class  
 
 * [WebUntis](#WebUntis)
     * [new WebUntis(school)](#new_WebUntis_new)
@@ -58,22 +56,19 @@ console.log(absences);
 ### new WebUntis(school)
 Creates a WebUntis instance.
 
+**Params**
 
-| Param | Type |
-| --- | --- |
-| school | <code>string</code> | 
+- school <code>string</code>
 
 <a name="WebUntis+authenticate"></a>
 
 ### webUntis.authenticate(username, password) ⇒ <code>Object</code>
 Authenticates this instance with the given login data.
 
-**Kind**: instance method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type |
-| --- | --- |
-| username | <code>string</code> | 
-| password | <code>string</code> | 
+- username <code>string</code>
+- password <code>string</code>
 
 <a name="WebUntis+getAbsences"></a>
 
@@ -81,74 +76,61 @@ Authenticates this instance with the given login data.
 Returns all absences, excused and unexcused, in the given interval for 
 the current user.
 
-**Kind**: instance method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type |
-| --- | --- |
-| startDate | <code>Date</code> | 
-| endDate | <code>Date</code> | 
+- startDate <code>Date</code>
+- endDate <code>Date</code>
 
 <a name="WebUntis+getCurrentSchoolyear"></a>
 
 ### webUntis.getCurrentSchoolyear() ⇒ <code>Object</code>
 Gets the current schoolyear.
 
-**Kind**: instance method of [<code>WebUntis</code>](#WebUntis)  
 <a name="WebUntis+getTimetableWeek"></a>
 
 ### webUntis.getTimetableWeek(date) ⇒ [<code>Array.&lt;TimetableEntry&gt;</code>](#TimetableEntry)
 Gets the timetable of the current user for a given week.
 
-**Kind**: instance method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type | Description |
-| --- | --- | --- |
-| date | <code>Date</code> | any day of the week for which the timetable is                      requested |
+- date <code>Date</code> - any day of the week for which the timetable is
+                     requested
 
 <a name="WebUntis.parseUntisTime"></a>
 
 ### WebUntis.parseUntisTime(untisTime) ⇒ <code>Object</code>
-**Kind**: static method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type |
-| --- | --- |
-| untisTime | <code>string</code> | 
+- untisTime <code>string</code>
 
 <a name="WebUntis.parseUntisDate"></a>
 
 ### WebUntis.parseUntisDate(untisDate) ⇒ <code>Date</code>
-**Kind**: static method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type | Description |
-| --- | --- | --- |
-| untisDate | <code>string</code> | 'YYYYMMDD' |
+- untisDate <code>string</code> - 'YYYYMMDD'
 
 <a name="WebUntis.parseUntisDateTime"></a>
 
 ### WebUntis.parseUntisDateTime(untisDate, untisTime) ⇒ <code>Date</code>
-**Kind**: static method of [<code>WebUntis</code>](#WebUntis)  
+**Params**
 
-| Param | Type | Description |
-| --- | --- | --- |
-| untisDate | <code>String</code> \| <code>Number</code> | 'YYYYMMDD' |
-| untisTime | <code>String</code> \| <code>Number</code> | 'HHMM' local 24h based time |
+- untisDate <code>String</code> | <code>Number</code> - 'YYYYMMDD'
+- untisTime <code>String</code> | <code>Number</code> - 'HHMM' local 24h based time
 
 <a name="WebUntis.dateToUntisDate"></a>
 
 ### WebUntis.dateToUntisDate(date, [separator]) ⇒ <code>string</code>
-**Kind**: static method of [<code>WebUntis</code>](#WebUntis)  
 **Returns**: <code>string</code> - - An Untis date of the format 'YYYY*MM*DD' where '*'
 stands for the optional separator.  
+**Params**
 
-| Param | Type | Default |
-| --- | --- | --- |
-| date | <code>Date</code> |  | 
-| [separator] | <code>string</code> | <code>&quot;&#x27;&#x27;&quot;</code> | 
+- date <code>Date</code>
+- [separator] <code>string</code> <code> = &quot;&#x27;&#x27;&quot;</code>
 
 <a name="Absence"></a>
 
 ## Absence : <code>object</code>
-**Kind**: global typedef  
 **Properties**
 
 | Name | Type |
@@ -160,7 +142,6 @@ stands for the optional separator.
 <a name="TimetableEntry"></a>
 
 ## TimetableEntry : <code>object</code>
-**Kind**: global typedef  
 **Properties**
 
 | Name | Type |
@@ -169,5 +150,3 @@ stands for the optional separator.
 | endDate | <code>Date</code> | 
 | subject | <code>string</code> | 
 | cancelled | <code>boolean</code> | 
-
-
