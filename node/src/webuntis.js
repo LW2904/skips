@@ -16,13 +16,15 @@ const WebUntis = class WebUntis {
         this.school = school;
     }
 
-    rpcify(method, params = {}) { return {
-        jsonrpc: '2.0',
-        method, params,
-        id: Date.now().toString(36),
-    } }
+    rpcify(method, params = {}) {
+        return {
+            jsonrpc: '2.0',
+            method, params,
+            id: Date.now().toString(36),
+        };
+    }
 
-    get rpcUri() { return `${BASE_URL}/jsonrpc.do?school=${this.school}` }
+    get rpcUri() { return `${BASE_URL}/jsonrpc.do?school=${this.school}`; }
 
     async authenticate(username, password) {
         if (!username || !password) {
@@ -76,13 +78,13 @@ const WebUntis = class WebUntis {
                 'sec-fetch-mode': 'cors',
                 'sec-fetch-site': 'same-origin',
                 // Removed `schoolname` and `traceid` cookies
-                'cookie': `JSESSIONID=${this.sessionId}`
+                'cookie': `JSESSIONID=${this.sessionId}`,
             },
             'referrer': 'https://erato.webuntis.com/WebUntis/?school=borglinz',
             'referrerPolicy': 'no-referrer-when-downgrade',
             'body': null,
             'method': 'GET',
-            'mode': 'cors'
+            'mode': 'cors',
         });
 
         console.log('getAbsences', { ok: result.ok });
