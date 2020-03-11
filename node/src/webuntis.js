@@ -1,8 +1,17 @@
 const BASE_URL = 'https://erato.webuntis.com/WebUntis';
 
 const fetch = require('node-fetch');
+const { startOfISOWeek } = require('date-fns');
 
 const WebUntis = class WebUntis {
+    /**
+     * @private
+     * @param {string} method 
+     * @param {object} [params={}] 
+     * 
+     * @returns {object} - A RPC spec compliant body object with the given
+     * method and parameters.
+     */
     static rpcify(method, params = {}) {
         return {
             jsonrpc: '2.0',
@@ -11,6 +20,11 @@ const WebUntis = class WebUntis {
         };
     }
 
+    /**
+     * @param {string} untisTime 
+     * 
+     * @returns {{hour: number, minute: number}}
+     */
     static parseUntisTime(untisTime) {
         const timeString = untisTime.toString().padStart(4, ' ');
 
@@ -20,6 +34,11 @@ const WebUntis = class WebUntis {
         };
     }
 
+    /**
+     * @param {string} untisDate - 'YYYYMMDD'
+     * 
+     * @returns {Date}
+     */
     static parseUntisDate(untisDate) {
         const dateString = untisDate.toString();
 
@@ -43,19 +62,28 @@ const WebUntis = class WebUntis {
     }
 
     /**
-     * @param {String | Number} untisDate - YYYYMMDD
-     * @param {String | Number} untisTime - HHMM local 24h based time
+     * @param {String | Number} untisDate - 'YYYYMMDD'
+     * @param {String | Number} untisTime - 'HHMM' local 24h based time
+     * 
+     * @returns {Date}
      */
     static parseUntisDateTime(untisDate, untisTime) {
         const date = WebUntis.parseUntisDate(untisDate);
         const time = WebUntis.parseUntisTime(untisTime);
 
-        date.setHours(time.hour);
+        date.setHours(time.hour + 1);
         date.setMinutes(time.minute);
 
         return date;
     }
 
+    /**
+     * @param {Date} date 
+     * @param {string} [separator=''] 
+     * 
+     * @returns {string} - An Untis date of the format 'YYYY*MM*DD' where '*'
+     * stands for the optional separator.
+     */
     static dateToUntisDate(date, separator = '') {
         const day = (date.getDate()).toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -63,22 +91,16 @@ const WebUntis = class WebUntis {
         return date.getFullYear() + separator + month + separator + day;
     }
 
-    static getMonday(date) {
-        const d = new Date(date);
-
-        const day = d.getDay() + 1;
-        const diff = d.getDate() - day;
-
-        d.setDate(diff);
-
-        return d;
-      }
-
     school = null;
 
     personId = null;
     sessionId = null;
 
+    /**
+     * Creates a WebUntis instance.
+     * 
+     * @param {string} school 
+     */
     constructor(school) {
         if (!school) {
             throw new Error('Insufficient arguments: school name required');
@@ -87,8 +109,19 @@ const WebUntis = class WebUntis {
         this.school = school;
     }
 
+    /**
+     * @private
+     */
     get rpcUri() { return `${BASE_URL}/jsonrpc.do?school=${this.school}`; }
 
+    /**
+     * Authenticates this instance with the given login data.
+     * 
+     * @param {string} username 
+     * @param {string} password 
+     * 
+     * @returns {{sessionId: string, personId: number}}
+     */
     async authenticate(username, password) {
         if (!username || !password) {
             throw new Error('Insufficient arguments: username, password required');
@@ -120,6 +153,23 @@ const WebUntis = class WebUntis {
         return { sessionId, personId };
     }
 
+    /**
+     * @typedef Absence
+     * @type {object}
+     * @property {Date} startDate
+     * @property {Date} endDate
+     * @property {boolean} excused
+     */
+
+    /**
+     * Returns all absences, excused and unexcused, in the given interval for 
+     * the current user.
+     * 
+     * @param {Date} startDate 
+     * @param {Date} endDate 
+     * 
+     * @returns {Absence[]}
+     */
     async getAbsences(startDate, endDate) {
         if (!this.sessionId) {
             throw new Error('Unauthenticated instance');
@@ -130,8 +180,9 @@ const WebUntis = class WebUntis {
         }
 
         const uri = `${BASE_URL}/api/classreg/absences/students?`
-            + `studentId=${this.personId}&startDate=${startDate}&endDate=${endDate}`
-            + `&excuseStatusId=-3&includeTodaysAbsence=true`
+            + `studentId=${this.personId}&excuseStatusId=-1&includeTodaysAbsence=true`
+            + `&startDate=${WebUntis.dateToUntisDate(startDate)}`
+            + `&endDate=${WebUntis.dateToUntisDate(endDate)}`;
 
         const result = await fetch(uri, {
             'headers': {
@@ -160,9 +211,24 @@ const WebUntis = class WebUntis {
             throw new Error('Failed retrieving data');
         }
 
-        return absences;
+        return absences.map((e) => {
+            const startDate = WebUntis.parseUntisDateTime(e.startDate,
+                e.startTime);
+            const endDate = WebUntis.parseUntisDateTime(e.endDate,
+                e.endTime);
+
+            return {
+                startDate, endDate,
+                excused: e.isExcused,
+            };
+        });
     }
 
+    /**
+     * Gets the current schoolyear.
+     * 
+     * @returns {{ name: string, startDate: Date, endDate: Date }}
+     */
     async getCurrentSchoolyear() {
         if (!this.sessionId) {
             throw new Error('Unauthenticated instance');
@@ -184,9 +250,27 @@ const WebUntis = class WebUntis {
             throw new Error('Failed retrieving data');
         }
 
-        return { name, startDate, endDate };
+        return { name, startDate: WebUntis.parseUntisDate(startDate),
+            endDate: WebUntis.parseUntisDate(endDate) };
     }
 
+    /**
+     * @typedef TimetableEntry
+     * @type {object}
+     * @property {Date} startDate
+     * @property {Date} endDate
+     * @property {string} subject
+     * @property {boolean} cancelled
+     */
+
+    /**
+     * Gets the timetable of the current user for a given week.
+     * 
+     * @param {Date} date - any day of the week for which the timetable is
+     *                      requested
+     * 
+     * @returns {TimetableEntry[]}
+     */
     async getTimetableWeek(date) {
         if (!date) {
             throw new Error('Insufficient arguments: date required');
@@ -196,8 +280,9 @@ const WebUntis = class WebUntis {
             throw new Error('Unauthenticated instance');
         }
 
+        // Use ISO weeks since they start on mondays
         const mondayInWeek = WebUntis.dateToUntisDate(
-            WebUntis.getMonday(date), '-');
+            startOfISOWeek(date), '-');
 
         const uri = `${BASE_URL}/api/public/timetable/weekly/data?`
             + `elementType=5&` // Student timetable, see RPC API spec

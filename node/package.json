@@ -9,6 +9,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "date-fns": "^2.10.0",
     "node-fetch": "^2.6.0"
   },
   "devDependencies": {
