@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "doc": "jsdoc2md --param-list-format list --heading-depth 2 --partial scope.hbs --files src/webuntis.js"
+    "doc": "jsdoc2md --param-list-format table --heading-depth 1 --partial scope.hbs --files src/webuntis.js > docs/api.md"
   },
   "author": "",
   "license": "MIT",
