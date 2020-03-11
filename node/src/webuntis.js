@@ -20,6 +20,21 @@ const WebUntis = class WebUntis {
         };
     }
 
+    static async request(...args) {
+        const result = await fetch(...args);
+
+        console.log(args[0], { ok: result.ok, status: result.status });
+
+        if (!result.ok) {
+            console.error(`request failed (${result.statusText})`);
+
+            const text = await result.text();
+            throw new Error(text);
+        } else {
+            return await result.json();
+        }
+    }
+
     /**
      * @param {string} untisTime 
      * 
@@ -127,19 +142,15 @@ const WebUntis = class WebUntis {
             throw new Error('Insufficient arguments: username, password required');
         }
 
-        const result = await fetch(this.rpcUri, {
+        const { sessionId, personId } = (await WebUntis.request(this.rpcUri, {
             'method': 'POST',
             'body': JSON.stringify(WebUntis.rpcify('authenticate', {
                 user: username, password,
             })),
-        });
-
-        console.log('authenticate', { ok: result.ok });
-
-        const { sessionId, personId } = (await result.json()).result;
+        })).result;
 
         if (!sessionId || !personId) {
-            throw new Error('Failed retrieving data');
+            throw new Error('Missing response data');
         }
 
         if (sessionId.length !== 32) {
@@ -184,7 +195,7 @@ const WebUntis = class WebUntis {
             + `&startDate=${WebUntis.dateToUntisDate(startDate)}`
             + `&endDate=${WebUntis.dateToUntisDate(endDate)}`;
 
-        const result = await fetch(uri, {
+        const { absences } = (await WebUntis.request(uri, {
             'headers': {
                 'accept': 'application/json',
                 'accept-language': 'en-US,en;q=0.9',
@@ -199,16 +210,12 @@ const WebUntis = class WebUntis {
             'body': null,
             'method': 'GET',
             'mode': 'cors',
-        });
-
-        console.log('getAbsences', { ok: result.ok });
-
-        const absences = (await result.json()).data.absences;
+        })).data;
 
         if (absences === null || typeof absences !== 'object' ||
             absences.length === undefined)
         {
-            throw new Error('Failed retrieving data');
+            throw new Error('Missing response data');
         }
 
         return absences.map((e) => {
@@ -234,20 +241,16 @@ const WebUntis = class WebUntis {
             throw new Error('Unauthenticated instance');
         }
 
-        const result = await fetch(this.rpcUri, {
+        const { name, startDate, endDate } = (await WebUntis.request(this.rpcUri, {
             'method': 'POST',
             'headers': {
                 'cookie': `JSESSIONID=${this.sessionId}`,
             },
             'body': JSON.stringify(WebUntis.rpcify('getCurrentSchoolyear')),
-        });
-
-        console.log('getCurrentSchoolyear', { ok: result.ok });
-
-        const { name, startDate, endDate } = (await result.json()).result;
+        })).result;
 
         if (!name || !startDate || !endDate) {
-            throw new Error('Failed retrieving data');
+            throw new Error('Missing response data');
         }
 
         return { name, startDate: WebUntis.parseUntisDate(startDate),
@@ -292,7 +295,7 @@ const WebUntis = class WebUntis {
             + `date=${mondayInWeek}&`
             + `formatId=1` // Untested
 
-        const result = await (await fetch(uri, {
+        const result = await WebUntis.request(uri, {
             'headers': {
                 'accept': 'application/json',
                 'accept-language': 'en-US,en;q=0.9',
@@ -307,7 +310,7 @@ const WebUntis = class WebUntis {
             'body': null,
             'method': 'GET',
             'mode': 'cors',
-        })).json();
+        });
 
         // What
         const data = result.data.result.data;
