@@ -1,10 +1,7 @@
 ## `skips/node`
 
 ```javascript
-// src/example.js
 const { WebUntis } = require('./index');
-
-const UNTIS_USER = '', UNTIS_PASS = '', UNTIS_SCHOOL = '';
 
 (async () => {
 
@@ -23,8 +20,9 @@ const timetable = await api.getTimetableWeek(new Date());
 console.log(`got timetable fpr the current week with ${timetable.length} lessons`);
 
 })().catch(console.error);
-
 ```
+
+See `src/example.js` for a runnable example.
 
 ## Documentation
 

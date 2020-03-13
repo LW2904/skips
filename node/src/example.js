@@ -1,3 +1,9 @@
+/**
+ * This example requires that the UNTIS_USER, UNTIS_PASS and UNTIC_SCHOOL 
+ * environment variables are set. It uses the dotenv module, so you can simply 
+ * add a .env file with the desired `NAME=VALUE` pairs to the project root.
+ */
+
 require('dotenv').config();
 
 const { UNTIS_USER, UNTIS_PASS, UNTIS_SCHOOL } = process.env;
