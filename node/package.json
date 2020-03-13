@@ -11,7 +11,9 @@
   "license": "MIT",
   "dependencies": {
     "date-fns": "^2.10.0",
-    "node-fetch": "^2.6.0"
+    "debug": "^4.1.1",
+    "node-fetch": "^2.6.0",
+    "supports-color": "^7.1.0"
   },
   "devDependencies": {
     "dotenv": "^8.2.0",

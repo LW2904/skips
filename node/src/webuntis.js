@@ -1,39 +1,10 @@
-const BASE_URL = 'https://erato.webuntis.com/WebUntis';
-
+const debug = require('debug');
 const fetch = require('node-fetch');
 const { startOfISOWeek } = require('date-fns');
 
 const WebUntis = class WebUntis {
-    /**
-     * @private
-     * @param {string} method 
-     * @param {object} [params={}] 
-     * 
-     * @returns {object} - A RPC spec compliant body object with the given
-     * method and parameters.
-     */
-    static rpcify(method, params = {}) {
-        return {
-            jsonrpc: '2.0',
-            method, params,
-            id: Date.now().toString(36),
-        };
-    }
-
-    static async request(...args) {
-        const result = await fetch(...args);
-
-        console.log(args[0], { ok: result.ok, status: result.status });
-
-        if (!result.ok) {
-            console.error(`request failed (${result.statusText})`);
-
-            const text = await result.text();
-            throw new Error(text);
-        } else {
-            return await result.json();
-        }
-    }
+    static debug = debug('webuntis');
+    static baseUrl = 'https://erato.webuntis.com/WebUntis';
 
     /**
      * @param {string} untisTime 
@@ -106,8 +77,6 @@ const WebUntis = class WebUntis {
         return date.getFullYear() + separator + month + separator + day;
     }
 
-    school = null;
-
     personId = null;
     sessionId = null;
 
@@ -122,12 +91,68 @@ const WebUntis = class WebUntis {
         }
 
         this.school = school;
+        this.debug = WebUntis.debug;
     }
 
     /**
-     * @private
+     * Wrapper around node-fetch, performs logging and request parsing. Throws
+     * an error for status codes <200 and >299.
+     * 
+     * @param {string} uri - The URI which is to be appended to the internal
+     * base URL.
+     * @param {...any} args - Will be passed directly to node-fetch, after the
+     * URL.
+     * 
+     * @returns {object} - Parsed response object.
      */
-    get rpcUri() { return `${BASE_URL}/jsonrpc.do?school=${this.school}`; }
+    async request(uri, ...args) {
+        const url = `${WebUntis.baseUrl}${uri}`;
+        // TODO: Merge headers given in args with reasonable default headers
+        const result = await fetch(url, ...args);
+
+        this.debug('%o: %O', result.status, uri.slice(0, uri.indexOf('?')));
+
+        if (!result.ok) {
+            // TODO: Implement error parsing
+            throw new Error(await result.text());
+        }
+
+        return await result.json();
+    }
+
+    /**
+     * Wrapper around {@link Requester#request} for performing RPC requests to
+     * the endpoint documented in the WebUntis RPC API spec.
+     * 
+     * @param {string} method - See the spec for acceptable values.
+     * @param {object} params - Appropiate parameters for the given method, see
+     * the spec for required params.
+     */
+    async rpc(method, params) {
+        this.debug('rpc request: %o', method);
+
+        const res = await this.request(`/jsonrpc.do?school=${this.school}`, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method, params,
+                id: Date.now().toString(36),
+            }),
+            headers: this.sessionId ? {
+                'cookie': `JSESSIONID=${this.sessionId}`,
+            } : {},
+        });
+
+        if (res.error) {
+            throw new Error(res.error);
+        }
+
+        if (!res.result) {
+            throw new Error(`No result returned`, res);
+        }
+
+        return res.result;
+    }
 
     /**
      * Authenticates this instance with the given login data.
@@ -142,12 +167,9 @@ const WebUntis = class WebUntis {
             throw new Error('Insufficient arguments: username, password required');
         }
 
-        const { sessionId, personId } = (await WebUntis.request(this.rpcUri, {
-            'method': 'POST',
-            'body': JSON.stringify(WebUntis.rpcify('authenticate', {
-                user: username, password,
-            })),
-        })).result;
+        const { sessionId, personId } = await this.rpc('authenticate', {
+            user: username, password,
+        });
 
         if (!sessionId || !personId) {
             throw new Error('Missing response data');
@@ -190,12 +212,12 @@ const WebUntis = class WebUntis {
             throw new Error('Insufficient arguments: startDate, endDate required');
         }
 
-        const uri = `${BASE_URL}/api/classreg/absences/students?`
+        const uri = `/api/classreg/absences/students?`
             + `studentId=${this.personId}&excuseStatusId=-1&includeTodaysAbsence=true`
             + `&startDate=${WebUntis.dateToUntisDate(startDate)}`
             + `&endDate=${WebUntis.dateToUntisDate(endDate)}`;
 
-        const { absences } = (await WebUntis.request(uri, {
+        const { absences } = (await this.request(uri, {
             'headers': {
                 'accept': 'application/json',
                 'accept-language': 'en-US,en;q=0.9',
@@ -241,13 +263,7 @@ const WebUntis = class WebUntis {
             throw new Error('Unauthenticated instance');
         }
 
-        const { name, startDate, endDate } = (await WebUntis.request(this.rpcUri, {
-            'method': 'POST',
-            'headers': {
-                'cookie': `JSESSIONID=${this.sessionId}`,
-            },
-            'body': JSON.stringify(WebUntis.rpcify('getCurrentSchoolyear')),
-        })).result;
+        const { name, startDate, endDate } = await this.rpc('getCurrentSchoolyear');
 
         if (!name || !startDate || !endDate) {
             throw new Error('Missing response data');
@@ -287,7 +303,7 @@ const WebUntis = class WebUntis {
         const mondayInWeek = WebUntis.dateToUntisDate(
             startOfISOWeek(date), '-');
 
-        const uri = `${BASE_URL}/api/public/timetable/weekly/data?`
+        const uri = `/api/public/timetable/weekly/data?`
             + `elementType=5&` // Student timetable, see RPC API spec
             + `elementId=${this.personId}&`
             // Must be the monday of the requested week, otherwise the next week
@@ -295,7 +311,7 @@ const WebUntis = class WebUntis {
             + `date=${mondayInWeek}&`
             + `formatId=1` // Untested
 
-        const result = await WebUntis.request(uri, {
+        const result = await this.request(uri, {
             'headers': {
                 'accept': 'application/json',
                 'accept-language': 'en-US,en;q=0.9',
@@ -316,9 +332,8 @@ const WebUntis = class WebUntis {
         const data = result.data.result.data;
 
         // {
-        //     type: 1 = klasse, 2 = teachers and others?, 3 = subject, 4 = room,
-        //         5 = student,
-        //     id: only unique within type
+        //     type: see RPC API spec,
+        //     id: only unique within type,
         //     for subjects:
         //     name: name,
         //     longName: long name, never used online?,
@@ -375,7 +390,7 @@ const WebUntis = class WebUntis {
                 subject: elements['3']
                     [rawPer.elements.filter((e) => e.type == 3)[0].id].name,
                 // This appears to be set even for substituted lessons, not sure
-                // if they officially count for the absence rate
+                // if they officially count for the absence rate etc.
                 cancelled: rawPer.is.cancelled || false,
             });
         }
