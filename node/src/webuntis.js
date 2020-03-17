@@ -3,14 +3,12 @@ const fetch = require('node-fetch');
 const { startOfISOWeek } = require('date-fns');
 
 const WebUntis = class WebUntis {
+    // Debug logging can be enabled by setting the environment variable `DEBUG`
+    // to `webuntis`.
     static debug = debug('webuntis');
     static baseUrl = 'https://erato.webuntis.com/WebUntis';
 
-    /**
-     * @param {string} untisTime 
-     * 
-     * @returns {{hour: number, minute: number}}
-     */
+    // `untisTime` should follow the format `HHMM`.
     static parseUntisTime(untisTime) {
         const timeString = untisTime.toString().padStart(4, ' ');
 
@@ -20,11 +18,7 @@ const WebUntis = class WebUntis {
         };
     }
 
-    /**
-     * @param {string} untisDate - 'YYYYMMDD'
-     * 
-     * @returns {Date}
-     */
+    // `untisDate` should follow the format `YYYYMMDD`.
     static parseUntisDate(untisDate) {
         const dateString = untisDate.toString();
 
@@ -38,7 +32,8 @@ const WebUntis = class WebUntis {
         date.setFullYear(year);
         date.setMonth(month - 1);
 
-        // Zero these to prevent confusion
+        // Zero unused date fields to prevent confusion since they would default
+        // to the current date.
         date.setHours(0);
         date.setMinutes(0);
         date.setSeconds(0);
@@ -47,29 +42,20 @@ const WebUntis = class WebUntis {
         return date;
     }
 
-    /**
-     * @param {String | Number} untisDate - 'YYYYMMDD'
-     * @param {String | Number} untisTime - 'HHMM' local 24h based time
-     * 
-     * @returns {Date}
-     */
+    // See `parseUntisTime` and `parseUntisDate` for argument formatting.
     static parseUntisDateTime(untisDate, untisTime) {
         const date = WebUntis.parseUntisDate(untisDate);
         const time = WebUntis.parseUntisTime(untisTime);
 
-        date.setHours(time.hour + 1);
+        // Since this works it can be assumed that Untis time hours are `[0, 23]`.
+        date.setHours(time.hour);
         date.setMinutes(time.minute);
 
         return date;
     }
 
-    /**
-     * @param {Date} date 
-     * @param {string} [separator=''] 
-     * 
-     * @returns {string} - An Untis date of the format 'YYYY*MM*DD' where '*'
-     * stands for the optional separator.
-     */
+    // Converts a JavaScript `Date` object to a Untis date (`YYYYMMDD`), with
+    // an optional separator between years, months and days.
     static dateToUntisDate(date, separator = '') {
         const day = (date.getDate()).toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -77,14 +63,11 @@ const WebUntis = class WebUntis {
         return date.getFullYear() + separator + month + separator + day;
     }
 
+    // Element ID of the logged in student.
     personId = null;
+    // Used for authentication through a `JSESSIONID` cookie.
     sessionId = null;
 
-    /**
-     * Creates a WebUntis instance.
-     * 
-     * @param {string} school 
-     */
     constructor(school) {
         if (!school) {
             throw new Error('Insufficient arguments: school name required');
@@ -94,48 +77,33 @@ const WebUntis = class WebUntis {
         this.debug = WebUntis.debug;
     }
 
-    /**
-     * Wrapper around node-fetch, performs logging and request parsing. Throws
-     * an error for status codes <200 and >299.
-     * 
-     * @param {string} uri - The URI which is to be appended to the internal
-     * base URL.
-     * @param {...any} args - Will be passed directly to node-fetch, after the
-     * URL.
-     * 
-     * @returns {object} - Parsed response object.
-     */
     async request(uri, ...args) {
         const url = `${WebUntis.baseUrl}${uri}`;
-        // TODO: Merge headers given in args with reasonable default headers
+        // TODO: Merge headers given in args with reasonable default headers.
         const result = await fetch(url, ...args);
 
+        // Don't log query strings for brevity (and security, of course).
         this.debug('%o: %O', result.status, uri.slice(0, uri.indexOf('?')));
 
         if (!result.ok) {
-            // TODO: Implement error parsing
+            // TODO: Implement error parsing.
             throw new Error(await result.text());
         }
 
         return await result.json();
     }
 
-    /**
-     * Wrapper around {@link Requester#request} for performing RPC requests to
-     * the endpoint documented in the WebUntis RPC API spec.
-     * 
-     * @param {string} method - See the spec for acceptable values.
-     * @param {object} params - Appropiate parameters for the given method, see
-     * the spec for required params.
-     */
     async rpc(method, params) {
         this.debug('rpc request: %o', method);
 
         const res = await this.request(`/jsonrpc.do?school=${this.school}`, {
             method: 'POST',
+            // Follows the JSON-RPC specification.
             body: JSON.stringify({
                 jsonrpc: '2.0',
                 method, params,
+                // This is completely arbitrary and unused in the library, but 
+                // the spec requires it.
                 id: Date.now().toString(36),
             }),
             headers: this.sessionId ? {
@@ -154,14 +122,6 @@ const WebUntis = class WebUntis {
         return res.result;
     }
 
-    /**
-     * Authenticates this instance with the given login data.
-     * 
-     * @param {string} username 
-     * @param {string} password 
-     * 
-     * @returns {{sessionId: string, personId: number}}
-     */
     async authenticate(username, password) {
         if (!username || !password) {
             throw new Error('Insufficient arguments: username, password required');
@@ -186,23 +146,6 @@ const WebUntis = class WebUntis {
         return { sessionId, personId };
     }
 
-    /**
-     * @typedef Absence
-     * @type {object}
-     * @property {Date} startDate
-     * @property {Date} endDate
-     * @property {boolean} excused
-     */
-
-    /**
-     * Returns all absences, excused and unexcused, in the given interval for 
-     * the current user.
-     * 
-     * @param {Date} startDate 
-     * @param {Date} endDate 
-     * 
-     * @returns {Absence[]}
-     */
     async getAbsences(startDate, endDate) {
         if (!this.sessionId) {
             throw new Error('Unauthenticated instance');
@@ -213,6 +156,8 @@ const WebUntis = class WebUntis {
         }
 
         const uri = `/api/classreg/absences/students?`
+            // `excuseStatusId` is untested and undocumented, not sure if it's
+            // even used, internally.
             + `studentId=${this.personId}&excuseStatusId=-1&includeTodaysAbsence=true`
             + `&startDate=${WebUntis.dateToUntisDate(startDate)}`
             + `&endDate=${WebUntis.dateToUntisDate(endDate)}`;
@@ -224,7 +169,7 @@ const WebUntis = class WebUntis {
                 'sec-fetch-dest': 'empty',
                 'sec-fetch-mode': 'cors',
                 'sec-fetch-site': 'same-origin',
-                // Removed `schoolname` and `traceid` cookies
+                // Removed `schoolname` and `traceid` cookies.
                 'cookie': `JSESSIONID=${this.sessionId}`,
             },
             'referrer': 'https://erato.webuntis.com/WebUntis/?school=borglinz',
@@ -253,11 +198,6 @@ const WebUntis = class WebUntis {
         });
     }
 
-    /**
-     * Gets the current schoolyear.
-     * 
-     * @returns {{ name: string, startDate: Date, endDate: Date }}
-     */
     async getCurrentSchoolyear() {
         if (!this.sessionId) {
             throw new Error('Unauthenticated instance');
@@ -273,23 +213,6 @@ const WebUntis = class WebUntis {
             endDate: WebUntis.parseUntisDate(endDate) };
     }
 
-    /**
-     * @typedef TimetableEntry
-     * @type {object}
-     * @property {Date} startDate
-     * @property {Date} endDate
-     * @property {string} subject
-     * @property {boolean} cancelled
-     */
-
-    /**
-     * Gets the timetable of the current user for a given week.
-     * 
-     * @param {Date} date - any day of the week for which the timetable is
-     *                      requested
-     * 
-     * @returns {TimetableEntry[]}
-     */
     async getTimetableWeek(date) {
         if (!date) {
             throw new Error('Insufficient arguments: date required');
@@ -299,17 +222,23 @@ const WebUntis = class WebUntis {
             throw new Error('Unauthenticated instance');
         }
 
-        // Use ISO weeks since they start on mondays
+        // Use ISO weeks since they start on mondays.
         const mondayInWeek = WebUntis.dateToUntisDate(
             startOfISOWeek(date), '-');
 
         const uri = `/api/public/timetable/weekly/data?`
-            + `elementType=5&` // Student timetable, see RPC API spec
+            // `elementType=5` is a timetable, see RPC API spec.
+            + `elementType=5&`
             + `elementId=${this.personId}&`
-            // Must be the monday of the requested week, otherwise the next week
-            // is returned
+            // `date` must be of the format `YYYY-MM-DD` (as opposed to the more
+            // commonly seen format `YYYYMMDD`). It should be the monday of the
+            // requested week, otherwise results for the following week are 
+            // returned. This was tested very hapharzardly, it might well be
+            // more nuanced than that.
             + `date=${mondayInWeek}&`
-            + `formatId=1` // Untested
+            // `formatId` is undocumented, I didn't test how it affects the
+            // response.
+            + `formatId=1`
 
         const result = await this.request(uri, {
             'headers': {
@@ -318,7 +247,7 @@ const WebUntis = class WebUntis {
                 'sec-fetch-dest': 'empty',
                 'sec-fetch-mode': 'cors',
                 'sec-fetch-site': 'same-origin',
-                // Removed schoolname cookie
+                // Removed the `schoolname` cookie.
                 'cookie': `JSESSIONID=${this.sessionId}`,
             },
             'referrer': 'https://erato.webuntis.com/WebUntis/index.do',
@@ -328,9 +257,11 @@ const WebUntis = class WebUntis {
             'mode': 'cors',
         });
 
-        // What
+        // Get your shit together, Untis.
         const data = result.data.result.data;
 
+        // `rawElements`, as returned by the request, follows the following format:
+        // ```
         // {
         //     type: see RPC API spec,
         //     id: only unique within type,
@@ -339,13 +270,15 @@ const WebUntis = class WebUntis {
         //     longName: long name, never used online?,
         //     ...
         // }
+        // ```
         const rawElements = data.elements;
 
+        // `rawPeriods`, as returned by the request, follows the following format:
+        // ```
         // {
         //     date: regular untis date string,
         //     endTime: number, 'HHMM',
         //     startTime: see endTime,
-        //     studentGroup: `${shortSubject}_${studentgroups}_${shortTeacher}`,
         //     elements: {
         //         id: element id within a type,
         //         type: element type,
@@ -353,11 +286,15 @@ const WebUntis = class WebUntis {
         //     },
         //     ...
         // }
+        // ```
+        // Of note for potential future rewrites is the `studentGroup` property
+        // with the format `${shortSubject}_${studentgroups}_${shortTeacher}`
+        // which could be used to skip crossmatching with `rawElements`.
         const rawPeriods = data.elementPeriods[data.elementIds[0]];
 
         const elements = {};
 
-        // Parse raw elements array into subarrays by type
+        // Parse raw elements array into subarrays by type.
         for (const rawEl of rawElements) {
             if (!elements[rawEl.type]) {
                 elements[rawEl.type] = [ rawEl ];
@@ -366,8 +303,8 @@ const WebUntis = class WebUntis {
             }
         }
 
-        // Parse type subarrays into objects with ids as keys
-        // Access elements through elements[type][id]
+        // Parse type subarrays into objects with ids as keys, elements can now be
+        // accessed through elements[type][id].
         for (const type in elements) {
             elements[type] = elements[type].reduce((acc, cur) => {
                 if (!acc[cur.id])
@@ -390,7 +327,7 @@ const WebUntis = class WebUntis {
                 subject: elements['3']
                     [rawPer.elements.filter((e) => e.type == 3)[0].id].name,
                 // This appears to be set even for substituted lessons, not sure
-                // if they officially count for the absence rate etc.
+                // if they officially count for absence rates and the like.
                 cancelled: rawPer.is.cancelled || false,
             });
         }

@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "doc": "jsdoc2md --param-list-format table --heading-depth 1 --partial docs/scope.hbs --files src/webuntis.js > docs/api.md"
+    "docs": "docco -o docs src/webuntis.js"
   },
   "author": "",
   "license": "MIT",
@@ -16,6 +16,7 @@
     "supports-color": "^7.1.0"
   },
   "devDependencies": {
+    "docco": "^0.8.0",
     "dotenv": "^8.2.0",
     "jsdoc-to-markdown": "^5.0.3"
   }

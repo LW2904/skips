@@ -25,6 +25,12 @@ const timetable = (await api.getTimetableWeek(new Date(2020, 3, 1)))
     .map((e) => ({ ...e, day: e.startDate.getDay() }));
 console.log(`got ${timetable.length} lessons`);
 
+console.log(timetable.map((e) => ({
+    ...e,
+    startDate: e.startDate.toLocaleString(),
+    endDate: e.endDate.toLocaleString(),
+})));
+
 /* const totalWeeks = eachWeekOfInterval({ start: startDate, end: endDate }).length;
 const totalLessons = timetable.reduce((acc, cur) => {
     if (acc[cur.subject])
