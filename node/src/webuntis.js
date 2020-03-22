@@ -95,8 +95,6 @@ const WebUntis = class WebUntis {
 
         const parsed = await result.json();
 
-        this.debug('parsed data', parsed);
-
         // This looks like it only happens with requests to `/api/public`
         if (parsed.data && parsed.data.error) {
             this.debug('request failed', parsed.data.error);
