@@ -82,15 +82,29 @@ const WebUntis = class WebUntis {
         // TODO: Merge headers given in args with reasonable default headers.
         const result = await fetch(url, ...args);
 
-        // Don't log query strings for brevity (and security, of course).
+        // Don't log query strings for brevity and to prevent leaks.
         this.debug('%o: %O', result.status, uri.slice(0, uri.indexOf('?')));
 
         if (!result.ok) {
             // TODO: Implement error parsing.
-            throw new Error(await result.text());
+            const error = await result.text();
+            this.debug('request failed', error);
+
+            throw new Error(error);
         }
 
-        return await result.json();
+        const parsed = await result.json();
+
+        this.debug('parsed data', parsed);
+
+        // This looks like it only happens with requests to `/api/public`
+        if (parsed.data && parsed.data.error) {
+            this.debug('request failed', parsed.data.error);
+    
+            throw new Error(parsed.data.error);
+        }
+
+        return parsed;
     }
 
     async rpc(method, params) {
@@ -256,6 +270,8 @@ const WebUntis = class WebUntis {
             'method': 'GET',
             'mode': 'cors',
         });
+
+        this.debug(result);
 
         // Get your shit together, Untis.
         const data = result.data.result.data;
