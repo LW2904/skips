@@ -7,7 +7,7 @@ if (!UNTIS_USER || !UNTIS_PASS || !UNTIS_SCHOOL) {
 }
 
 const { WebUntis } = require('./index');
-const { eachWeekOfInterval } = require('date-fns');
+const { getISODay, areIntervalsOverlapping } = require('date-fns');
 
 (async () => {
 
@@ -21,31 +21,44 @@ console.log(`the current school year (${name}) began ${startDate.toLocaleDateStr
 
 // The date is mostly arbitrary, should be a week with no substituted or
 // cancelled lessons
-const timetable = (await api.getTimetableWeek(new Date(2020, 3, 1)))
-    .map((e) => ({ ...e, day: e.startDate.getDay() }));
+const timetable = (await api.getTimetableWeek(new Date(2020, 2, 16)))
+    .map((e) => ({ ...e, day: getISODay(e.startDate) }));
 console.log(`got ${timetable.length} lessons`);
 
-console.log(timetable.map((e) => ({
-    ...e,
-    startDate: e.startDate.toLocaleString(),
-    endDate: e.endDate.toLocaleString(),
-})));
+const absences = (await api.getAbsences(startDate, endDate))
+    // Absences should never span multiple days so this is fine
+    .map((e) => ({ ...e, day: getISODay(e.startDate) }));
 
-/* const totalWeeks = eachWeekOfInterval({ start: startDate, end: endDate }).length;
-const totalLessons = timetable.reduce((acc, cur) => {
-    if (acc[cur.subject])
-        acc[cur.subject] += totalWeeks;
-    else acc[cur.subject] = totalWeeks;
+console.log(`got ${absences.length} absences`);
+
+const timetableDays = timetable.reduce((acc, cur) => {
+    if (acc[cur.day]) {
+        acc[cur.day].push(cur);
+    } else {
+        acc[cur.day] = [ cur ];
+    }
 
     return acc;
 }, {});
 
-console.log({ totalWeeks, totalLessons }); */
+const absentLessons = {};
 
-const absences = await api.getAbsences(startDate, endDate);
-console.log(`got ${absences.length} absences`);
+for (const a of absences) {
+    const td = timetableDays[a.day];
+    const ai = { start: a.startDate, end: a.endDate };
 
-const weeks = eachWeekOfInterval({ start: startDate, end: new Date() });
-console.log(weeks);
+    for (const l of td) {
+        l.startDate.setDate(a.startDate.getDate());
+        l.startDate.setMonth(a.startDate.getMonth());
+        l.endDate.setDate(a.endDate.getDate());
+        l.endDate.setMonth(a.endDate.getMonth());
+
+        if (areIntervalsOverlapping({ start: l.startDate, end: l.endDate }, ai)) {
+            absentLessons[l.subject] = (absentLessons[l.subject] || 0) + 1;
+        }
+    }
+}
+
+console.log(absentLessons);
 
 })().catch(console.error);
